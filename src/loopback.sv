@@ -1,33 +1,13 @@
 module loopback( 
-  output logic [15:0] LED,
-  input CLK,
-  input UART_RXD,
-  output logic UART_TXD
+  input clk,
+  input RsRx,
+  output logic RsTx
   );
   
   logic recv_ready, recv_ready_before, send_start, send_busy;
   logic [7:0] data;
-  Receiver recv(.CLK(CLK), .UART_RXD(UART_RXD), .DATA(data), .READY(recv_ready));
-  Sender send(.CLK(CLK), .UART_TXD(UART_TXD), .DATA(data), .START(send_start), .BUSY(send_busy));
-  
-  initial begin
-    LED = 0;
-    recv_ready = 0;
-    recv_ready_before = 0;
-    send_start = 0;
-    send_busy = 0;
-  end
-    
-  always @(posedge CLK) begin
-    recv_ready_before <= recv_ready;
-    if(recv_ready_before == 0 && recv_ready == 1) begin
-      LED[7:0] <= data;
-      send_start <= 1;
-    end
-    if(send_busy == 1) begin
-      send_start <= 0;
-    end
-  end
+  Receiver recv(.CLK(clk), .UART_RXD(RsRx), .DATA(data), .READY(recv_ready));
+  Sender send(.CLK(clk), .UART_TXD(RsTx), .DATA(data), .START(recv_ready), .BUSY(send_busy));
 endmodule
 
 module Receiver(
