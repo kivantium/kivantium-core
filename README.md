@@ -1,5 +1,6 @@
 kivantium
 ==============
+[![Build Status](https://travis-ci.org/kivantium/kivantium.svg?branch=master)](https://travis-ci.org/kivantium/kivantium)
 
 The core of kivantium CPU.
 
