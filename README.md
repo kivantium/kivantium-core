@@ -3,7 +3,7 @@ kivantium
 
 The core of kivantium CPU.
 
-For more information, please check Wiki.
+For more information, please check [Wiki](https://github.com/kivantium/kivantium/wiki).
 
 Progress
 --------
