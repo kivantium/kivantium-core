@@ -591,6 +591,7 @@ int parse_slti(char* arg, int addr) {
 #ifdef DEBUG
     printf("%08x: slti%s", bin, arg);
 #endif
+    fwrite(&bin, sizeof(int), 1, bin_out);
     return 0;
 }
 int execute_slti(instruction inst, int pc) {
