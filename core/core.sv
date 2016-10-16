@@ -1,4 +1,4 @@
-module loopback( 
+module core( 
   input clk,
   input RsRx,
   input btnC,
@@ -10,7 +10,7 @@ module loopback(
   );
   // state definition
   typedef enum logic [3:0] {
-      RECV, FETCH, DECODE, EXEC, WRITE
+      RECV, FETCH, DECODE, EXEC, WRITE, ABORT
   } State;
   State state;
   
@@ -43,7 +43,8 @@ module loopback(
     recv_count = 0;
     state = RECV;
     for(int i=0; i<1024; i++)
-      memory[i] <= 0;
+      memory[i] = 0;
+    Register[31] <= 32'hffffffff;
   end
   
   always_ff @(posedge clk) begin
@@ -53,21 +54,24 @@ module loopback(
     SEG_data <= PC[15:0];
     // Reset
     if(btnC_buf == 1) begin
-      state <= RECV;
       SEG_enable <= 0;
+      count <= 0;
       PC <= 0;
-      led <= 0;
       recv_count <= 0;
+      state <= RECV;
+      led <= 0;
       for(int i=0; i<1024; i++)
         memory[i] <= 0;
+      Register[31] <= 32'hffffffff;
     end
     // Change to Execution mode
-    if(btnU_buf == 1) begin
-      state = FETCH;
+    else if(btnU_buf == 1) begin
+      state <= FETCH;
       SEG_enable <= 1;
       count <= 0;
     end
     
+    else begin
     case(state)
       RECV: begin
         // when USART receive finished, save it to memory
@@ -80,13 +84,17 @@ module loopback(
       
       FETCH: begin
         if(count == 100000000) begin
-          state <= DECODE;
-          count <= 0;
-          instruction[7:0] <= memory[PC];
-          instruction[15:8] <= memory[PC+1];
-          instruction[23:16] <= memory[PC+2];
-          instruction[31:24] <= memory[PC+3];
-          PC <= PC + 4;
+          if(PC == 32'hffffffff) begin
+            state <= ABORT;
+          end else begin
+            state <= DECODE;
+            count <= 0;
+            instruction[7:0] <= memory[PC];
+            instruction[15:8] <= memory[PC+1];
+            instruction[23:16] <= memory[PC+2];
+            instruction[31:24] <= memory[PC+3];
+            PC <= PC + 4;
+          end
         end else begin       
           count <= count + 1;
         end
@@ -96,15 +104,31 @@ module loopback(
           state <= FETCH;
           count <= 0;
           case(instruction[31:26])
-            6'b001101: begin
+            6'b001001: begin  // addiu TODO: sign_extend
+              Register[instruction[20:16]] <= instruction[15:0] + Register[instruction[25:21]];
+            end
+            6'b001010: begin  // slti TODO: sign_extend
+              if(Register[instruction[25:21]] < instruction[15:0]) begin 
+                Register[instruction[20:16]] <= 1;
+              end else begin
+                Register[instruction[20:16]] <= 0;
+              end
+            end
+            6'b001101: begin  // ori TODO: sign_extend
               Register[instruction[20:16]] <= instruction[15:0] | Register[instruction[25:21]];
             end
             6'b00000: begin
               case(instruction[5:0])
-                6'b001100: begin
+                6'b001000: begin // jr
+                  PC <= Register[instruction[25:21]];
+                end
+                6'b001100: begin // syscall
                   if(Register[2] == 1) begin
                     led <= Register[4];
                   end
+                end
+                6'b100001: begin // addu
+                  Register[instruction[15:11]] <= Register[instruction[25:21]] + Register[instruction[20:16]];
                 end
               endcase
             end
@@ -118,6 +142,7 @@ module loopback(
       WRITE: begin
       end
     endcase
+  end
   end
 endmodule
 
