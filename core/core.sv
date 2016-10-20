@@ -1,6 +1,7 @@
 module core( 
   input clk,
   input RsRx,
+  output RsTx,
   input btnC,
   input btnU,
   //output logic RsTx,
@@ -10,29 +11,38 @@ module core(
   );
   // state definition
   typedef enum logic [3:0] {
-      RECV, FETCH, DECODE, EXEC, WRITE, ABORT
+      RECV, FETCH, DECODE, EXEC, MEMORY, WRITE, ABORT
   } State;
   State state;
   
-  // buffer of input
-  logic btnC_buf, btnU_buf;
-  // logics about receive mode
-  logic recv_ready, recv_ready_before;
-  // logic send_busy;
-  logic [7:0] USART_data;
-  logic SEG_enable;
-  logic [15:0] SEG_data;
-  logic [15:0] recv_count;
-  logic [7:0] memory [0:1023];
-  // logics about execution
+  // core
   logic [31:0] PC;
   logic [31:0] instruction;
   logic [31:0] Register [0:31];
   logic [31:0] count; // for delay
   
-  // module connection
+  // memory
+  parameter DATA_WIDTH=32, ADDR_WIDTH=12, WORDS=4096;
+  logic [ADDR_WIDTH-1:0] memory_addr;
+  logic [DATA_WIDTH-1:0] memory_data_in;
+  logic [DATA_WIDTH-1:0] memory_data_out;
+  logic memory_read_write;
+  RAM memory(.clk(clk), .addr(memory_addr), .data_in(memory_data_in), 
+             .data_out(memory_data_out), .read_write(memory_read_write)); 
+  
+  // USART
+  logic recv_ready, recv_ready_before;
+  // logic send_busy;
+  logic [7:0] USART_data;
+  logic [15:0] recv_count;
+  logic [7:0] USART_data_tmp[0:3];
   Receiver recv(.CLK(clk), .UART_RXD(RsRx), .DATA(USART_data), .READY(recv_ready));
   //Sender send(.CLK(clk), .UART_TXD(RsTx), .DATA(USART_data), .START(recv_ready), .BUSY(send_busy));
+  
+  // I/O
+  logic btnC_buf, btnU_buf;
+  logic SEG_enable;
+  logic [15:0] SEG_data;
   LEDSeg segment(.CLK(clk), .DATA(SEG_data), .ENABLE(SEG_enable), .OUT_K(seg), .OUT_A(an));
   
   initial begin
@@ -42,8 +52,6 @@ module core(
     PC = 0;
     recv_count = 0;
     state = RECV;
-    for(int i=0; i<1024; i++)
-      memory[i] = 0;
     Register[31] <= 32'hffffffff;
   end
   
@@ -60,8 +68,6 @@ module core(
       recv_count <= 0;
       state <= RECV;
       led <= 0;
-      for(int i=0; i<1024; i++)
-        memory[i] <= 0;
       Register[31] <= 32'hffffffff;
     end
     // Change to Execution mode
@@ -72,27 +78,38 @@ module core(
     end
     
     else begin
-    case(state)
+    case(state)    
       RECV: begin
-        // when USART receive finished, save it to memory
-        recv_ready_before <= recv_ready;
-        if(recv_ready_before == 0 && recv_ready == 1) begin
-          memory[recv_count] <= USART_data;
-          recv_count <= recv_count + 1;
-        end
+      // when USART receive finished, save it to memory
+      recv_ready_before <= recv_ready;
+      if(recv_ready_before == 0 && recv_ready == 1) begin
+        USART_data_tmp [recv_count[1:0]] <= USART_data;
+        recv_count <= recv_count + 1;
       end
-      
-      FETCH: begin
+      else if(recv_ready_before == 1 && recv_count[1:0] == 2'b00) begin
+        memory_read_write <= 1;
+        memory_addr <= recv_count[ADDR_WIDTH-1:0];
+        memory_data_in[7:0]   <= USART_data_tmp[0];
+        memory_data_in[15:8]  <= USART_data_tmp[1];
+        memory_data_in[23:16] <= USART_data_tmp[2];
+        memory_data_in[31:24] <= USART_data_tmp[3];
+      end
+      if(memory_read_write == 1) begin
+        memory_read_write <= 0;
+      end
+    end      
+    FETCH: begin
+        memory_addr <= PC[ADDR_WIDTH-1:0];
         if(count == 100000000) begin
           if(PC == 32'hffffffff) begin
             state <= ABORT;
           end else begin
             state <= DECODE;
             count <= 0;
-            instruction[7:0] <= memory[PC];
-            instruction[15:8] <= memory[PC+1];
-            instruction[23:16] <= memory[PC+2];
-            instruction[31:24] <= memory[PC+3];
+            instruction[7:0] <= memory_data_out[7:0];
+            instruction[15:8] <= memory_data_out[15:8];
+            instruction[23:16] <= memory_data_out[23:16];
+            instruction[31:24] <= memory_data_out[31:24];
             PC <= PC + 4;
           end
         end else begin       
@@ -101,11 +118,23 @@ module core(
       end
       DECODE: begin
         if(count == 100000000) begin
-          state <= FETCH;
+          state <= MEMORY;
           count <= 0;
           case(instruction[31:26])
+            6'b000010: begin  // j
+              PC <= PC[31:28] + (instruction[25:0]<<2) - 4;
+            end
+            6'b000011: begin // jal
+              Register[31] <= PC + 4;
+              PC <= PC[31:28] + (instruction[25:0]<<2) - 4;
+            end
+            6'b000100: begin // beq
+              if(Register[instruction[25:21]]==Register[instruction[20:16]]) begin
+                PC <= PC + (instruction[15:0]<<2) - 4;
+              end
+            end
             6'b001001: begin  // addiu TODO: sign_extend
-              Register[instruction[20:16]] <= instruction[15:0] + Register[instruction[25:21]];
+              Register[instruction[20:16]] <= Register[instruction[25:21]] + $signed(instruction[15:0]);
             end
             6'b001010: begin  // slti TODO: sign_extend
               if(Register[instruction[25:21]] < instruction[15:0]) begin 
@@ -116,6 +145,14 @@ module core(
             end
             6'b001101: begin  // ori TODO: sign_extend
               Register[instruction[20:16]] <= instruction[15:0] | Register[instruction[25:21]];
+            end
+            6'b100011: begin // lw
+              memory_addr <= Register[instruction[25:21]][ADDR_WIDTH-1:0]+instruction[ADDR_WIDTH-1:0];
+            end
+            6'b101011: begin // sw
+              memory_addr <= Register[instruction[25:21]][ADDR_WIDTH-1:0]+instruction[ADDR_WIDTH-1:0];
+              memory_data_in <= Register[instruction[20:16]];
+              memory_read_write <= 1;
             end
             6'b00000: begin
               case(instruction[5:0])
@@ -137,12 +174,37 @@ module core(
           count <= count + 1;
         end
       end
-      EXEC: begin
-      end
-      WRITE: begin
+      MEMORY: begin
+        if(instruction[31:26] == 6'b100011) begin //lw
+           Register[instruction[20:16]] <= memory_data_out;
+        end
+        else if(instruction[31:26] == 6'b101011) begin //sw
+          memory_read_write <= 1;
+        end
+        state <= FETCH;
       end
     endcase
   end
+  end
+endmodule
+
+module RAM(clk, addr, data_in, data_out, read_write);
+  parameter DATA_WIDTH=32, ADDR_WIDTH=12, WORDS=4096;
+
+  input clk, read_write;
+  input [ADDR_WIDTH-1:0] addr;
+  input [DATA_WIDTH-1:0] data_in;
+  output logic [DATA_WIDTH-1:0] data_out;
+  (* RAM_STYLE="BLOCK" *) logic [DATA_WIDTH-1:0] mem [WORDS-1:0];
+
+  integer i;
+  initial begin
+    for(i=0; i<WORDS; i=i+1) mem[i]=0;
+  end
+  
+  always @(posedge clk) begin
+    if(read_write == 1) mem[addr] <= data_in;
+    else data_out <= mem[addr];
   end
 endmodule
 
@@ -282,6 +344,7 @@ module Receiver(
     end
   end
 endmodule
+
 
 /*module Sender(
   input CLK, 
