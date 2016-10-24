@@ -5,7 +5,7 @@
 #define BUF_SIZE 1024
 #define TABLE_SIZE 256
 #define REGISTER_SIZE 32
-#define MEMORY_SIZE 4096
+#define MEMORY_SIZE 256
 #define OPCODE_SIZE 20
 
 
@@ -323,8 +323,8 @@ int parse_beq(char* arg, int addr) {
             instruction_list[addr].op1 = op[1].value;
         } else flag = 1;
         if(op[2].type == LABEL) {
-            bin |= (op[2].value - addr*4);
-            instruction_list[addr].op2 = (op[2].value - addr*4);
+            bin |= ((op[2].value - addr*4)>>2);
+            instruction_list[addr].op2 = ((op[2].value - addr*4)>>2);
         } else flag = 1;
     } else {
         flag = 1;
@@ -349,7 +349,7 @@ int execute_beq(instruction inst, int pc) {
 #ifdef DEBUG
         printf("TRUE; pc <= pc + 0x%02x (result: %08x)\n", inst.op2, pc+inst.op2); 
 #endif
-        return pc+inst.op2;
+        return pc+(inst.op2<<2);
     } else {
 #ifdef DEBUG
         printf("FALSE; pc <= pc + 4 (result: %08x)\n", pc+4); 
