@@ -52,6 +52,9 @@ module core(
     PC = 0;
     recv_count = 0;
     state = RECV;
+    Register[0]  <= 0;
+    Register[29] <= WORDS*4-8;
+    Register[30] <= WORDS*4-4;
     Register[31] <= 32'hffffffff;
   end
   
@@ -68,6 +71,9 @@ module core(
       recv_count <= 0;
       state <= RECV;
       led <= 0;
+      Register[0]  <= 0;
+      Register[29] <= WORDS*4-8;
+      Register[30] <= WORDS*4-4;
       Register[31] <= 32'hffffffff;
     end
     // Change to Execution mode
@@ -88,7 +94,7 @@ module core(
       end
       else if(recv_ready_before == 1 && recv_count[1:0] == 2'b00) begin
         memory_read_write <= 1;
-        memory_addr <= recv_count[ADDR_WIDTH-1:0];
+        memory_addr <= recv_count[ADDR_WIDTH-1:0]-4;
         memory_data_in[7:0]   <= USART_data_tmp[0];
         memory_data_in[15:8]  <= USART_data_tmp[1];
         memory_data_in[23:16] <= USART_data_tmp[2];
@@ -179,7 +185,7 @@ module core(
            Register[instruction[20:16]] <= memory_data_out;
         end
         else if(instruction[31:26] == 6'b101011) begin //sw
-          memory_read_write <= 1;
+          memory_read_write <= 0;
         end
         state <= FETCH;
       end
