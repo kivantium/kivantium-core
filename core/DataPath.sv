@@ -39,7 +39,7 @@ module DataPath(
           .op(aluctrl), .out(aluout), .iszero(iszero));
           
   // About memory input
-  IOMemory #(256) mmem(.clk(clk), .writeaddr(aluout), .writedata(readdata1), .writeenable(memwrite),
+  IOMemory #(64) mmem(.clk(clk), .writeaddr(aluout), .writedata(readdata1), .writeenable(memwrite),
                     .readaddr(aluout), .readdata(memdataout), .stdout(stdout));
   MUX #(32) mrmux(.in0(aluout), .in1(memdataout), .out(writedata), .sel(memtoreg));
 endmodule

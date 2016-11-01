@@ -2,7 +2,7 @@ module Loader(
   input clk, RsRx, btnU, btnC,
   output logic reset, sysclk, 
   output logic [31:0] pmemaddr, pmemdata, 
-  output logic pmemwe
+  output logic pmemwe, mode
 );
   
   // Loader state 
@@ -32,19 +32,24 @@ module Loader(
     // Reset
     if(btnCBuf == 1) begin
       state <= WAIT;
+      counter <= 0;
       recvcount <= 0;
       reset <= 1;
+      if(sysclk == 0) sysclk <= 1;
+      else sysclk <= 0;
     end else begin
+      sysclk <= 1;
       reset <= 0;
     end
     
-    // state transition
-    if(btnUBuf == 1) begin
-      state <= EXEC;
-    end
-
     // program loading
     if(state == WAIT) begin
+      // state transition
+      if(btnUBuf == 1) begin
+        state <= EXEC;
+      end
+
+      mode <= 0;
       // when USART receive finished, save it to memory
       recvreadybefore <= recvready;
       if(recvreadybefore == 0 && recvready == 1) begin
@@ -69,8 +74,13 @@ module Loader(
 
     // provide delayed clock
     if(state == EXEC) begin
-      if(counter == 50000000) begin
-        sysclk <= !sysclk;
+      mode <= 1;
+      if(counter <= 1000000) begin
+        sysclk <= 0;
+      end else begin
+        sysclk <= 1;
+      end
+      if(counter >= 2000000) begin
         counter <= 0;
       end else begin
         counter <= counter + 1;

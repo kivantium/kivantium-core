@@ -1,7 +1,6 @@
 module LEDSeg(
-  input clk,
+  input clk, reset, enable,
   input [15:0] data,
-  input enable,
   output logic [6:0] k,
   output logic [3:0] a
 );
@@ -14,6 +13,12 @@ module LEDSeg(
   Decoder dec(.in(num), .out(k));
   
   always_ff @(posedge clk) begin
+    if(reset == 1) begin
+      counter <= 0;
+      digit <= 0;
+      data_buf <= 0;
+      num <= 0;
+    end
     if(enable == 0) begin
       a <= 4'b1111;
     end else begin
