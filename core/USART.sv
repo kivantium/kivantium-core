@@ -1,39 +1,18 @@
-module loopback( 
-  input clk,
-  input RsRx,
-  output logic RsTx
-  );
-  
-  logic recv_ready, recv_ready_before, send_start, send_busy;
-  logic [7:0] data;
-  Receiver recv(.CLK(clk), .UART_RXD(RsRx), .DATA(data), .READY(recv_ready));
-  Sender send(.CLK(clk), .UART_TXD(RsTx), .DATA(data), .START(recv_ready), .BUSY(send_busy));
-endmodule
-
 module Receiver(
-  input CLK,
-  input UART_RXD,
-  output logic [7:0] DATA,
-  output logic READY
-  );
+  input clk,
+  input RX,
+  output logic [7:0] data,
+  output logic ready
+);
   logic [3:0] recv_bit;
   logic [16:0] count;
   logic status, rx_buf;
-  initial begin
-    DATA = 0;
-    READY = 0;
-    count = 0;
-    rx_buf = 1;
-    status = 0;
-    recv_bit = 0;
-  end
   
-  
-  always @(posedge CLK) begin
-    rx_buf <= UART_RXD;
+  always @(posedge clk) begin
+    rx_buf <= RX;
     if(status == 0 && rx_buf == 0) 
       status <= 1;
-      READY <= 0;
+      ready <= 0;
     
     if(status == 1) begin
       if(count == 10416) begin
@@ -41,21 +20,22 @@ module Receiver(
           if(recv_bit == 8) begin
             recv_bit <= 0;
             status <= 0;
-            READY <= 1;
+            ready <= 1;
           end else
             recv_bit <= recv_bit + 1;
       end else begin
         count <= count + 1;
         if(count == 5000) begin
           case(recv_bit)
-            1: DATA[0] <= rx_buf;
-            2: DATA[1] <= rx_buf;
-            3: DATA[2] <= rx_buf;
-            4: DATA[3] <= rx_buf;
-            5: DATA[4] <= rx_buf;
-            6: DATA[5] <= rx_buf;
-            7: DATA[6] <= rx_buf;
-            8: DATA[7] <= rx_buf;
+            1: data[0] <= rx_buf;
+            2: data[1] <= rx_buf;
+            3: data[2] <= rx_buf;
+            4: data[3] <= rx_buf;
+            5: data[4] <= rx_buf;
+            6: data[5] <= rx_buf;
+            7: data[6] <= rx_buf;
+            8: data[7] <= rx_buf;
+            default: ;
           endcase
         end
       end
@@ -63,7 +43,7 @@ module Receiver(
   end
 endmodule
 
-module Sender(
+/*module Sender(
   input CLK, 
   output logic UART_TXD,
   input [7:0] DATA,
@@ -114,4 +94,4 @@ module Sender(
       end      
     end
   end
-endmodule
+endmodule*/
