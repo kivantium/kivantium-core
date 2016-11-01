@@ -12,3 +12,4 @@ Progress
 - 2016/10/16 `addiu`, `addu`, `jr`, `ori`, `slti`, `syscall` are partially implemented (able to run each test case. However, there are many GACHA element to success.)
 - 2016/10/19 learned how to use Block RAM
 - 2016/10/24 instructions except `sw` and `lw` are working
+- 2016/11/01 recursive fib run on kivantium v0 (vivado simulator).
