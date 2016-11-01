@@ -5,7 +5,7 @@
 #define BUF_SIZE 1024
 #define TABLE_SIZE 256
 #define REGISTER_SIZE 32
-#define MEMORY_SIZE 256
+#define MEMORY_SIZE 4096
 #define OPCODE_SIZE 20
 
 
@@ -20,7 +20,7 @@ enum operand_type {
 
 enum instructions {
     ADDU, ADDIU, BEQ, J, JAL, JR, LW, 
-    ORI, SLTI, SW, SYSCALL
+    ORI, SLT, SLTI, SW, SYSCALL
 };
 
 
@@ -52,6 +52,7 @@ char opcode[OPCODE_SIZE][16] = {
     "jr",    
     "lw",         
     "ori",   
+    "slt",  
     "slti",  
     "sw",    
     "syscall", 
@@ -323,8 +324,8 @@ int parse_beq(char* arg, int addr) {
             instruction_list[addr].op1 = op[1].value;
         } else flag = 1;
         if(op[2].type == LABEL) {
-            bin |= ((op[2].value - addr*4)>>2);
-            instruction_list[addr].op2 = ((op[2].value - addr*4)>>2);
+            bin |= ((op[2].value - addr*4 - 1)>>2);
+            instruction_list[addr].op2 = ((op[2].value - addr*4 - 1)>>2);
         } else flag = 1;
     } else {
         flag = 1;
@@ -349,7 +350,7 @@ int execute_beq(instruction inst, int pc) {
 #ifdef DEBUG
         printf("TRUE; pc <= pc + 0x%02x (result: %08x)\n", inst.op2, pc+inst.op2); 
 #endif
-        return pc+(inst.op2<<2);
+        return pc+4+(inst.op2<<2);
     } else {
 #ifdef DEBUG
         printf("FALSE; pc <= pc + 4 (result: %08x)\n", pc+4); 
@@ -401,7 +402,7 @@ int parse_jal(char* arg, int addr) {
 
     if(get_operand(arg, 1, op) == 1) {
         if(op[0].type == LABEL) {
-            bin |= op[0].value;
+            bin |= (op[0].value>>2);
             instruction_list[addr].op0 = (op[0].value>>2);
         } else flag = 1;
     } else {
@@ -559,6 +560,48 @@ int execute_ori(instruction inst, int pc) {
     return pc+4;
 }
 
+int parse_slt(char* arg, int addr) {
+    operand op[3];
+    int bin = 0x2A;
+    int flag = 0;
+    addr /= 4;
+    instruction_list[addr].name = SLT;
+
+    if(get_operand(arg, 3, op) == 3) {
+        if(op[0].type == REGISTER) {
+            bin |= (op[0].value << 11);
+            instruction_list[addr].op0 = op[0].value;
+        } else flag = 1;
+        if(op[1].type == REGISTER) {
+            bin |= (op[1].value << 21);
+            instruction_list[addr].op1 = op[1].value;
+        } else flag = 1;
+        if(op[2].type == REGISTER) {
+            bin |= (op[2].value << 16);
+            instruction_list[addr].op2 = op[2].value;
+        } else flag = 1;
+    } else {
+        flag = 1;
+    }
+
+    if(flag) {
+        fprintf(stderr, "Bad operand: %s\n", arg);
+        exit_error(0, arg, 0);
+    }
+    /* debug display */
+#ifdef DEBUG
+    printf("%08x: slt%s", bin, arg);
+#endif
+    fwrite(&bin, sizeof(int), 1, bin_out);
+    return 0;
+}
+int execute_slt(instruction inst, int pc) {
+#ifdef DEBUG
+    printf("%08x: slt $%d $%d $%d\n", pc, inst.op0, inst.op1, inst.op2);
+#endif
+    reg[inst.op0] = (reg[inst.op1] < reg[inst.op2]);
+    return pc+4;
+}
 int parse_slti(char* arg, int addr) {
     operand op[3];
     int bin = 0xa << 26;
@@ -652,6 +695,7 @@ int execute_sw(instruction inst, int pc) {
 #endif
 
     mem[(reg[inst.op1]+inst.op2)/4] = reg[inst.op0];
+    if((reg[inst.op1]+inst.op2)/4  == 0) fprintf(stderr, "%x\n", reg[inst.op0]);
     return pc+4;
 }
 int parse_syscall(char* arg, int addr) {
@@ -697,6 +741,8 @@ int execute(int pc) {
             return execute_lw(inst, pc);
         case ORI:
             return execute_ori(inst, pc);
+        case SLT:
+            return execute_slt(inst, pc);
         case SLTI:
             return execute_slti(inst, pc);
         case SW:
@@ -859,6 +905,7 @@ int main(int argc, char** argv) {
                     else if(strcmp("jr", token) == 0)      parse_jr(line+j, instruction_address);
                     else if(strcmp("lw", token) == 0)      parse_lw(line+j, instruction_address);
                     else if(strcmp("ori", token) == 0)     parse_ori(line+j, instruction_address);
+                    else if(strcmp("slt", token) == 0)    parse_slt(line+j, instruction_address);
                     else if(strcmp("slti", token) == 0)    parse_slti(line+j, instruction_address);
                     else if(strcmp("sw", token) == 0)      parse_sw(line+j, instruction_address);
                     else if(strcmp("syscall", token) == 0) parse_syscall(line+j, instruction_address);
@@ -887,8 +934,15 @@ int main(int argc, char** argv) {
     reg[31] = -1;            /* set initial $ra */
     printf("\nEXECUTE\n");
     while(nextpc != -1) {
+        int t;
         /* printf("$sp: %d, $fp: %d, $ra: %08x\n", reg[29], reg[30], reg[31]);*/
-        nextpc = execute(nextpc);
+        t = execute(nextpc);
+        if(t == nextpc) {
+            fprintf(stderr, "break\n");
+            break;
+        }
+        else nextpc = t;
+        reg[0] = 0;
         fflush(stdout);
     }
 
