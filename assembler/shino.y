@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 #define MAX_MEMORY 64
 typedef enum Type {Rformat, Iformat, Jformat} Type;
@@ -21,6 +22,8 @@ instruction program[MAX_MEMORY];
 symbol table[MAX_MEMORY];
 int table_size = 0;
 int addr = 0;
+FILE *outfile;
+
 int get_address(char* label) {
     int i;
     for(i=0; i<=table_size; i++) {
@@ -34,8 +37,12 @@ int get_address(char* label) {
 }
 void print_bin(uint32_t bin) {
     int i;
-    for(i=31; i>=0; i--)  printf("%u", (bin>>i)&1);
-    printf("\n");
+    if(outfile == stdout) {
+        for(i=31; i>=0; i--) printf("%u", (bin>>i)&1);
+        printf("\n");
+    } else {
+        fwrite(&bin, sizeof(bin), 1, outfile);
+    }
 }
     
 void generate_binary(void) {
@@ -70,8 +77,7 @@ void generate_binary(void) {
                 exit(EXIT_FAILURE);
                 break;
         }
-        //print_bin(bin);
-        printf("%08x\n", bin);
+        print_bin(bin);
     }
 }
 %}
@@ -201,12 +207,39 @@ jump
 
 %%
 
-main() {
+void main(int argc, char **argv) {
+    extern FILE* yyin;
+    int ch;
+    extern char *optarg;
+    extern int optind, opterr;
+    outfile = stdout;
+    while ((ch = getopt(argc, argv, "o:")) != -1){
+        switch (ch){
+            case 'o':
+                if((outfile = fopen(optarg, "wb")) == NULL) {
+                    fprintf(stderr, "failed to open output file\n");
+                    exit(EXIT_FAILURE);
+                }
+              break;
+        }
+    }
+  argc -= optind;
+  argv += optind;
+    if(argc != 1) {
+        fprintf(stderr, "input file not specified\n");
+        fprintf(stderr, "Usage: ./shino <assembly file> <option>\n");
+        exit(EXIT_FAILURE);
+    }
+    if((yyin = fopen(argv[0], "r")) == NULL) {
+        fprintf(stderr, "input file not found\n");
+        exit(EXIT_FAILURE);
+    }
+    
     yyparse();
     generate_binary();
 }
 
 yyerror(char *msg) {
     extern int yylineno;
-    fprintf(stderr,"At line %d %s\n",yylineno, msg);
+    fprintf(stderr,"l%d: %s\n",yylineno, msg);
 }
