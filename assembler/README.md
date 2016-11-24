@@ -10,5 +10,5 @@ Usage
 ------
 ```
 make
-./shino < program.asm > out.bin
+./shino program.asm -o out.bin
 ```
