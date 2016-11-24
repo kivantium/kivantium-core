@@ -13,3 +13,7 @@ Progress
 - 2016/10/19 learned how to use Block RAM
 - 2016/10/24 instructions except `sw` and `lw` are working
 - 2016/11/01 recursive fib succeeded. [Video](https://twitter.com/kivantium/status/793435185488404481)
+
+LICENSE
+--------
+This project is licensed under the terms of the MIT license.
