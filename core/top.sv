@@ -11,8 +11,16 @@ module top(
   output logic [15:0] led
 );
 
-  cpu_top cpu(.clk(clk));
+  logic reset;
+  logic [31:0] instruction;
+  cpu_top cpu(.clk(clk), .reset(reset), .instruction(instruction));
   
+  assign led = instruction[15:0];
+  
+  always_ff @(posedge clk) begin
+    if (RsRx) reset = 1'b1;
+  end
+    
 endmodule
 
 `default_nettype wire

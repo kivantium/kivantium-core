@@ -12,14 +12,11 @@ module Register(
   (* ram_style = "distributed" *)
   logic [31:0] register [0:31];
     
-  assign readdata1 = (readaddr1 != 0) ? register[readaddr1] : 0;
-  assign readdata2 = (readaddr2 != 0) ? register[readaddr2] : 0;
-   
-  always_ff @(posedge clk or negedge reset) begin
-    if(reset == 1'b0) begin
-      for(int i=0; i<32; i++) register[i] <= 0;
-    end
-    if(reg_we == 1) begin
+  assign readdata1 = (readaddr1 == 0) ? 32'b0 : register[readaddr1];
+  assign readdata2 = (readaddr2 == 0) ? 32'b0 : register[readaddr2];
+  
+  always_ff @(posedge clk) begin
+    if(reg_we) begin
       register[writeaddr] <= writedata;
     end
   end

@@ -4,7 +4,7 @@ module DataCache(
   input wire clk,
   input wire [31:0] readaddr, writeaddr, writedata,
   input wire we,
-  output logic readdata
+  output logic [31:0] readdata
 );
   
   (* ram_style = "block" *)
@@ -14,6 +14,5 @@ module DataCache(
     if (we) memory[writeaddr] <= writedata;
     readdata <= memory[readaddr];
   end 
-
 endmodule
 `default_nettype wire
