@@ -42,7 +42,6 @@ int get_address(char* label) {
 void print_bin(uint32_t bin, int pc) {
     int i;
     if(outfile == stdout) {
-        printf("%02x: ", pc);
         for(i=31; i>=0; i--) printf("%u", (bin>>i)&1);
         printf("\n");
     } else {
@@ -186,12 +185,12 @@ instruction
         tmp->bin |= (0x1 << 7); // save pc to $ra
         tmp->label = strdup($2);
         addr += 4;}
-    | JAL REGISTER LABEL {
+    | JAL REGISTER CAMMA LABEL {
         instruction *tmp = &program[addr>>2];
         tmp->format = UJtype;
         tmp->bin |= 0x6f;       // opcode 1101111
         tmp->bin |= ($2 << 7); // save pc to $ra
-        tmp->label = strdup($3);
+        tmp->label = strdup($4);
         addr += 4;}
     | JALR REGISTER CAMMA IMMEDIATE LPAREN REGISTER RPAREN {
         instruction *tmp = &program[addr>>2];
