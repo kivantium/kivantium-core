@@ -1,72 +1,92 @@
-`timescale 1ns / 1ps
+`timescale 1ns / 100ps
 `default_nettype none
 
 module cpu_top(
   input wire clk, reset,
-  output logic [31:0] instruction
+  output logic [31:0] current_pc
 );
   
+  logic stall_if, stall_dp;
+  
   // Fetch
-  logic kill_fc, stall_fc;
-  logic [31:0] nextpc;
-  logic [31:0] instruction0, inst0_pc;
-  Fetch fc(.clk(clk), .reset(reset), .kill(kill_fc), .stall(stall_fc), .nextpc(nextpc),
-            .instruction0(instruction0), .inst0_pc(inst0_pc));
-  assign instruction = instruction0;              
-  // Decode
-  logic kill_dc, stall_dc;
-  logic [63:0] decoded_inst0;
-  logic [31:0] decoded_inst0_pc;
-  Decode dc(.clk(clk), .reset(reset), .kill(kill_dc), .stall(stall_dc),
-            .fetched_inst0(instruction0), .fetched_inst0_pc(inst0_pc),
-            .decoded_inst0(decoded_inst0), .decoded_inst0_pc(decoded_inst0_pc));
+  logic [31:0] next_pc, correct_pc, instruction;
+  logic [63:0] fetch_data;
+  logic misprediction, pred_taken;
+  
+  ProgramCounter pc(.clk(clk), .reset(reset), .next_pc(next_pc), .current_pc(current_pc));
+  InstructionMemory imem(.clk(clk), .current_pc(current_pc), .instruction(instruction));
+  BranchPrediction branchpred(.clk(clk), .reset(reset), .current_pc(current_pc), .next_pc(next_pc), 
+                              .misprediction(misprediction), .correct_pc(correct_pc), 
+                              .pred_taken(pred_taken));
+  Fetch ifetch(.clk(clk), .reset(reset), .stall(stall_if), 
+               .instruction(instruction), .current_pc(current_pc), 
+               .fetch_data(fetch_data));
+  
   // Dispatch
-  logic kill_dp, stall_dp;
-  logic [31:0] dispatched_pc;
-  logic [2:0] rs_destination;
-  logic [75:0] rs_integer;
-  logic [103:0] rs_loadstore;
-  logic [105:0] rs_branch;
-  logic [4:0] dp_rs1, dp_rs2;
-  Dispatch dp(.clk(clk), .reset(reset), .kill(kill_dp), .stall(stall_dp),
-              .decoded_inst0(decoded_inst0), .decoded_inst0_pc(decoded_inst0_pc),
-              .dispatched_pc(dispatched_pc),
-              .rs_destination(rs_destination), .rs_integer(rs_integer), .rs_loadstore(rs_loadstore),
-              .rs_branch(rs_branch),
-              .rs1(dp_rs1), .rs2(dp_rs2), .regdata1(regdata1), .regdata2(regdata2));
-  logic [31:0] regdata1, regdata2;
+  logic arf_busy1, arf_busy2, rob_valid1, rob_valid2;
+  logic [4:0] src_reg1, src_reg2, complete_reg, dp_arf_dest;
+  logic [5:0] arf_tag1, arf_tag2, rob_free_entry, dp_rob_dest;
+  logic [31:0] arf_read_data1, arf_read_data2, rob_read_data1, rob_read_data2, complete_data;
+  logic [32:0] src_data1, src_data2;
+  logic arf_write_enable;
+  logic [4:0] arf_write_reg;
+  logic [31:0] arf_write_data;  
+  logic consume_rrf, complete_we, execute_we;
   
-  logic [4:0] complete_rd;
-  logic [31:0] complete_data;
-  logic complete_we;
+  ARF arf(.clk(clk), .rob_free_entry(rob_free_entry), .dp_arf_dest(dp_arf_dest),
+          .src_reg1(src_reg1), .arf_read_data1(arf_read_data1), .arf_busy1(arf_busy1), .arf_tag1(arf_tag1), 
+          .src_reg2(src_reg2), .arf_read_data2(arf_read_data2), .arf_busy2(arf_busy2), .arf_tag2(arf_tag2),
+          .arf_write_enable(arf_write_enable), .arf_write_reg(arf_write_reg),
+          .arf_write_data(arf_write_data));
   
-  Register rf(.clk(clk), .reset(reset), .readaddr1(dp_rs1), .readaddr2(dp_rs2),
-              .readdata1(regdata1), .readdata2(regdata2),
-              .writeaddr(complete_rd), .writedata(complete_data), .reg_we(complete_we));
-  // Execute
-  logic kill_ex, stall_ex;
-  logic finish_ex;
-  logic [31:0] memread_addr, memread_data, memwrite_addr, memwrite_data;
-  logic memwrite_enable;
-  logic [31:0] load_data;
- 
-  Execute ex(.clk(clk), .reset(reset), .kill(kill_ex), .stall(stall_ex), .dispatched_pc(dispatched_pc), .nextpc(nextpc),
-             .in_rs_destination(rs_destination), .in_rs_integer(rs_integer), .in_rs_loadstore(rs_loadstore),
-             .in_rs_branch(rs_branch), .memread_data(memread_data), .memread_addr(memread_addr),
-             .memwrite_addr(memwrite_addr), .memwrite_data(memwrite_data), 
-             .memwrite_enable(memwrite_enable), .complete_rd(complete_rd));
-    
-  DataCache dcache(.clk(clk), .readaddr(memread_addr), .readdata(memread_data), 
-                   .we(memwrite_enable), .writeaddr(memwrite_addr), .writedata(memwrite_data));
-  // Complete
-  logic kill_cp, stall_cp;
-  Complete cp(.clk(clk), .kill(kill_cp), .stall(stall_cp), 
-              .complete_data(complete_data), .rd_complete(complete_rd), .complete_we(complete_we));
-    
-  logic [4:0] stalls; 
-  logic [2:0] state;
-  Controller ctrl(.clk(clk), .reset(reset), .stalls(stalls), .state(state));
-  assign {stall_fc, stall_dc, stall_dp, stall_ex, stall_cp} = stalls;
-  assign {kill_fc, kill_dc, kill_dp, kill_ex, kill_cp} = 5'b00000;
+  logic [40:0] dp_rob_data;
+  logic rob_is_full, notify_stall_dp;
+
+  ReOrderBuffer rob(.clk(clk), .reset(reset), .rob_free_entry(rob_free_entry), .rob_is_full(rob_is_full),
+                    .stall_dp(notify_stall_dp), .dp_rob_dest(dp_rob_dest), .dp_rob_data(dp_rob_data),
+                    .read_entry1(arf_tag1), .rob_read_data1(rob_read_data1), .rob_valid1(rob_valid1),
+                    .read_entry2(arf_tag2), .rob_read_data2(rob_read_data2), .rob_valid2(rob_valid2),
+                    .cdb_integer(cdb_integer),
+                    .arf_write_enable(arf_write_enable), .arf_write_reg(arf_write_reg), 
+                    .arf_write_data(arf_write_data));
+  
+  SRC_MUX smux(.arf_read_data1(arf_read_data1), .arf_busy1(arf_busy1), .arf_tag1(arf_tag1), 
+               .rob_read_data1(rob_read_data1), .rob_valid1(rob_valid1), .src_data1(src_data1),
+               .arf_read_data2(arf_read_data2), .arf_busy2(arf_busy2), .arf_tag2(arf_tag2),  
+               .rob_read_data2(rob_read_data2), .rob_valid2(rob_valid2), .src_data2(src_data2));
+  logic [2:0] rs_is_full, rs_destination;
+  logic rs_integer_is_full, rs_branch_is_full, rs_loadstore_is_full;
+  logic rs_dest_integer, rs_dest_branch, rs_dest_loadstore;
+  assign {rs_dest_integer, rs_dest_branch, rs_dest_loadstore} = rs_destination;
+  assign rs_is_full = {rs_integer_is_full, rs_branch_is_full, rs_loadstore_is_full};
+  
+  logic [75:0] rs_integer;  
+  logic [107:0] rs_loadstore;
+  logic [139:0] rs_branch;
+  
+  Dispatch dp(.clk(clk), .reset(reset), .stall(stall_dp), .fetch_data(fetch_data),
+               .src_reg1(src_reg1), .src_reg2(src_reg2), .src_data1(src_data1), .src_data2(src_data2),
+               .rob_is_full(rob_is_full), .rob_free_entry(rob_free_entry), .pred_taken(pred_taken),
+               .arf_dest(dp_arf_dest), .rob_dest(dp_rob_dest), .rob_data(dp_rob_data),
+               .rs_is_full(rs_is_full), .notify_stall_dp(notify_stall_dp),
+               .rs_destination(rs_destination),
+               .rs_integer(rs_integer), .rs_branch(rs_branch), .rs_loadstore(rs_loadstore));
+                   
+  // temporary assignment
+  assign stall_if = notify_stall_dp;
+  assign stall_dp = notify_stall_dp;
+  assign misprediction = 1'b0; // TODO: temporary
+  
+  logic [37:0] cdb_integer, cdb_branch, cdb_load_store;
+  logic [31:0] dmem_read_addr, dmem_read_data;
+  ExecInteger exec_int(.clk(clk), .reset(reset),  .rs_is_full(rs_integer_is_full),
+             .rs_dest(rs_dest_integer), .rs_data(rs_integer), .cdb_data(cdb_integer));
+  ExecBranch exec_br(.clk(clk), .reset(reset), .rs_is_full(rs_integer_is_full),
+             .rs_dest(rs_dest_branch), .rs_data(rs_branch), .cdb_data(cdb_branch));
+  ExecLoadStore exec_ls(.clk(clk), .reset(reset), .rs_is_full(rs_loadstore_is_full),
+                .rs_dest(rs_dest_loadstore), .rs_data(rs_loadstore), .cdb_data(cdb_load_store),
+                .dmem_read_addr(dmem_read_addr), .dmem_read_data(dmem_read_data));
+  DataMemory dm(.clk(clk), .read_addr(dmem_read_addr), .read_data(dmem_read_data));
 endmodule
+
 `default_nettype wire

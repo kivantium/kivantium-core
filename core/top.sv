@@ -12,10 +12,10 @@ module top(
 );
 
   logic reset;
-  logic [31:0] instruction;
-  cpu_top cpu(.clk(clk), .reset(reset), .instruction(instruction));
+  logic [31:0] pc;
+  cpu_top cpu(.clk(clk), .reset(reset), .current_pc(pc));
   
-  assign led = instruction[15:0];
+  assign led = pc[15:0];
   
   always_ff @(posedge clk) begin
     if (RsRx) reset = 1'b1;

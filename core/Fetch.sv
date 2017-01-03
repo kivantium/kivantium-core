@@ -1,21 +1,17 @@
 `default_nettype none
 module Fetch(
-  input wire clk, reset, kill, stall,
-  input wire [31:0] nextpc,
-  output logic [31:0] instruction0, inst0_pc
+  input wire clk, reset, stall,
+  input wire [31:0] instruction, current_pc,
+  output logic [63:0] fetch_data
 );
-  
-  logic [31:0] pc;
-  
-  InstCache icache(.clk(clk), .addr(pc), .inst0(instruction0));
-  assign inst0_pc = pc;
+  logic [31:0] fetched_pc;
   
   always_ff @(posedge clk or posedge reset) begin
-    if(reset) begin
-      pc <= 0;
-    end else if(!stall) begin
-      pc <= nextpc;
-    end
+    if(reset) fetched_pc <= 32'b0;
+    else fetched_pc <= current_pc;
+  end
+  always_comb begin
+    fetch_data = {fetched_pc, instruction};
   end
 endmodule
 `default_nettype wire
