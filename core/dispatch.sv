@@ -109,7 +109,7 @@ module decode(pc, inst, src_reg1, src_reg2, rd_reg, dest_rob,
         src_reg1 = {1'b0, inst[19:15]};
         src_reg2 = {1'b0, inst[24:20]};
         rd_reg = 6'd0;
-        rs_inst = {7'b1, inst[14:12]};
+        rs_inst = {7'b0, inst[14:12]};
         rs_opr1 = src_data1;
         rs_opr2 = src_data2;
         rs_offset = pc + {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0};
@@ -119,10 +119,20 @@ module decode(pc, inst, src_reg1, src_reg2, rd_reg, dest_rob,
         src_reg1 = {1'b0, inst[19:15]};
         src_reg2 = 6'd0;
         rd_reg = inst[11:7];
-        rs_inst = 10'b1100;
+        rs_inst = 10'b1000000_000;
         rs_opr1 = src_data1;
-        rs_opr2 = src_data2;
-        rs_offset = {{20{inst[31]}}, inst[31:20]};
+        rs_opr2 = {1'b1, {{20{inst[31]}}, inst[31:20]}};
+        rs_offset = pc + 32'd4;
+      end
+      `JAL: begin
+        rs_dest = 4'b0100;
+        src_reg1 = 6'd0;
+        src_reg2 = 6'd0;
+        rd_reg = inst[11:7];
+        rs_inst = 10'b0100000_000;
+        rs_opr1 = {1'b1, pc};
+        rs_opr2 = {1'b1, {12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0};
+        rs_offset = pc + 32'd4;
       end
       default: begin
         rs_dest = 4'b0000;
