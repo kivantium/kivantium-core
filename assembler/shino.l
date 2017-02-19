@@ -44,9 +44,9 @@ other .
 "sub"       {yylval.INT = 0x0; return SUB;}
 "sra"       {yylval.INT = 0x5; return SRA;}
 "nop"       {yylval.INT = 0x0; return NOP;}
-"jal"       {return JAL;}
 "jalr"      {return JALR;}
-"j"         {return JAL;}
+"jal"       {return JAL;}
+"j"         {return J;}
 "beq"       {yylval.INT = 0x0; return BEQ;}
 "bne"       {yylval.INT = 0x1; return BNE;}
 "blt"       {yylval.INT = 0x4; return BLT;}

@@ -11,9 +11,9 @@ module registerFile(clk, reset, mispred, read_reg1, read_reg2, read_data1, read_
   input wire [5:0] write_reg, write_tag;
   input wire [31:0] write_data;
   
+  logic [63:0] busy;
   logic [31:0] rf [0:63];
   logic [5:0] tag [0:63];
-  logic [63:0] busy;
   
   assign read_data1 = (read_reg1==6'd0) ? {1'b0, 32'd0} : {busy[read_reg1], rf[read_reg1]};
   assign read_data2 = (read_reg2==6'd0) ? {1'b0, 32'd0} : {busy[read_reg2], rf[read_reg2]};
@@ -29,12 +29,10 @@ module registerFile(clk, reset, mispred, read_reg1, read_reg2, read_data1, read_
     end else begin
       busy[dc_rd] <= 1'b1;
       tag[dc_rd] <= rob_free_entry;
-      
-      if(we) begin
-        rf[write_reg] <= write_data;
-        if(write_tag == tag[write_reg]) busy[write_reg] <= 1'b0;
-      end
-      
+    end
+    if(we) begin
+      rf[write_reg] <= write_data;
+      if(write_tag == tag[write_reg]) busy[write_reg] <= 1'b0;  
     end
   end
 endmodule

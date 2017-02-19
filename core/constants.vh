@@ -1,3 +1,5 @@
+`timescale 1ns / 1ns
+
 `define LOAD      7'b0000011
 `define LOAD_FP   7'b0000111
 `define custom_0  7'b0001011
@@ -31,6 +33,6 @@
 `define custom_3  7'b1111011
 `define UNKNOWN   7'b1111111
 
-`define RS_INTEGER 3'b000
-`define RS_LOAD_STORE 3'b001
-`define RS_BRANCH 3'b010
+`define INST_INTEGER 3'b000
+`define INST_LOAD_STORE 3'b001
+`define INST_BRANCH 3'b010

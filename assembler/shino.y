@@ -82,7 +82,7 @@ void generate_binary(void) {
 
 %token CAMMA LPAREN RPAREN COLON RET
 %token <INT> REGISTER IMMEDIATE
-%token <INT> LUI AUIPC JAL JALR BEQ BNE BLT BGE BLTU BGEU
+%token <INT> LUI AUIPC J JAL JALR BEQ BNE BLT BGE BLTU BGEU
 %token <INT> LB LH LW LBU LHU SB SH SW
 %token <INT> ADDI SLTI SLTIU XORI ORI ANDI SLLI SRLI SRAI NOP
 %token <INT> ADD SUB SLL SLT SLTU XOR SRL SRA OR AND
@@ -185,12 +185,12 @@ instruction
         tmp->bin |= (0x1 << 7); // save pc to $ra
         tmp->label = strdup($2);
         addr += 4;}
-    | JAL REGISTER CAMMA LABEL {
+    | J LABEL {
         instruction *tmp = &program[addr>>2];
         tmp->format = UJtype;
         tmp->bin |= 0x6f;       // opcode 1101111
-        tmp->bin |= ($2 << 7); // save pc to $ra
-        tmp->label = strdup($4);
+        tmp->bin |= (0x0 << 7); // save pc to $zero
+        tmp->label = strdup($2);
         addr += 4;}
     | JALR REGISTER CAMMA IMMEDIATE LPAREN REGISTER RPAREN {
         instruction *tmp = &program[addr>>2];

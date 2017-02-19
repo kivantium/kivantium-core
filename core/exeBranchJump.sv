@@ -51,7 +51,7 @@ module exeBranchJump(en, rs2exe, cdb, jump_addr);
       endcase
     end else begin
       cdb = {6'b0, 32'dx};
-      cdb = {6'b0, 1'b0, 32'dx};
+      jump_addr = {6'b0, 1'b0, 32'dx};
     end
   end
 endmodule

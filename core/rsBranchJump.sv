@@ -1,12 +1,12 @@
 `default_nettype none
 
-module rsBranchJump(clk, reset, we, kill, is_full, dc2rs, rs2exe, ex_en, cdb1, cdb2);
+module rsBranchJump(clk, reset, we, kill, is_full, dc2rs, rs2exe, ex_en, cdb1, cdb2, cdb3);
   input wire clk, reset, we, kill;
   output wire is_full;
   input wire [113:0] dc2rs;
   output logic [111:0] rs2exe;
   output logic ex_en;
-  input wire [37:0] cdb1, cdb2;
+  input wire [37:0] cdb1, cdb2, cdb3;
   
   logic [9:0] rs_inst;
   logic [5:0] rs_dest;
@@ -59,6 +59,15 @@ module rsBranchJump(clk, reset, we, kill, is_full, dc2rs, rs2exe, ex_en, cdb1, c
         if(!valid2[i] && opr2[i]=={26'b0, cdb2[37:32]}) begin
           valid2[i] <= 1'b1;
           opr2[i] <= cdb2[31:0];
+        end
+        
+        if(!valid1[i] && opr1[i]=={26'b0, cdb3[37:32]}) begin
+          valid1[i] <= 1'b1;
+          opr1[i] <= cdb3[31:0];
+        end
+        if(!valid2[i] && opr2[i]=={26'b0, cdb3[37:32]}) begin
+          valid2[i] <= 1'b1;
+          opr2[i] <= cdb3[31:0];
         end
       end
     end
