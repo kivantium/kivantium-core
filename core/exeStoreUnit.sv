@@ -15,9 +15,10 @@ module exeStoreUnit(clk, reset, en, rs2exe, store2rob);
     if(en) begin
       addr = opr1 + offset;
       case(width) 
-        3'b000: cropped_data = {{24{opr2[7]}}, opr2[7:0]}; // SB
+        3'b000: cropped_data = {{24{opr2[7]}}, opr2[7:0]};   // SB
         3'b001: cropped_data = {{16{opr2[15]}}, opr2[15:0]}; // SH
-        3'b010: cropped_data = opr2; // SW
+        3'b010: cropped_data = opr2;                         // SW
+        default: cropped_data = 32'bx;
       endcase
       store2rob = {dest, addr, cropped_data};
     end else begin

@@ -7,7 +7,6 @@ module cpu_top(clk, reset, led);
   logic stall;
   logic mispred, misload;
   logic signal_miss;
-  logic [31:0] rob_head_pc;
   logic [31:0] commit_pc;
   logic [31:0] nextpc;
   logic [31:0] if_pc, if_inst;        // fetch signals
@@ -39,6 +38,8 @@ module cpu_top(clk, reset, led);
   logic [31:0] dmem_read_addr, dmem_read_data, dmem_write_addr, dmem_write_data;
   logic [63:0] loadunit2buf;
   logic [2:0] loadbuf_free_entry, loadbuf_commit_entry;
+  
+  assign led = if_pc[15:0];
   
   fetch fc(
     .clk(clk),
@@ -225,7 +226,7 @@ module cpu_top(clk, reset, led);
     .read_data(dmem_read_data),
     .write_addr(dmem_write_addr),
     .write_data(dmem_write_data),
-    .stdout(led)
+    .stdout()
   );
   
   reorderBuffer rob(
@@ -257,8 +258,7 @@ module cpu_top(clk, reset, led);
     .dmem_we(dmem_we),
     .store_addr(dmem_write_addr),
     .store_data(dmem_write_data),
-    .misload(misload),
-    .rob_head_pc(rob_head_pc)
+    .misload(misload)
   );
 
 endmodule

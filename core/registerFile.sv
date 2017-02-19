@@ -15,10 +15,11 @@ module registerFile(clk, reset, mispred, read_reg1, read_reg2, read_data1, read_
   logic [31:0] rf [0:63];
   logic [5:0] tag [0:63];
   
+  always_ff @(posedge clk) begin
+    if(we) rf[write_reg] <= write_data;
+  end
   assign read_data1 = (read_reg1==6'd0) ? {1'b0, 32'd0} : {busy[read_reg1], rf[read_reg1]};
   assign read_data2 = (read_reg2==6'd0) ? {1'b0, 32'd0} : {busy[read_reg2], rf[read_reg2]};
-  assign read_tag1  = tag[read_reg1];
-  assign read_tag2  = tag[read_reg2];
   
   always_ff @(posedge clk) begin
     if(reset || mispred) begin
@@ -29,11 +30,14 @@ module registerFile(clk, reset, mispred, read_reg1, read_reg2, read_data1, read_
     end else begin
       busy[dc_rd] <= 1'b1;
       tag[dc_rd] <= rob_free_entry;
-    end
-    if(we) begin
-      rf[write_reg] <= write_data;
-      if(write_tag == tag[write_reg]) busy[write_reg] <= 1'b0;  
+      if(we) begin
+        if(write_tag == tag[write_reg]) busy[write_reg] <= 1'b0;  
+      end
     end
   end
+  
+  assign read_tag1 = tag[read_reg1];
+  assign read_tag2 = tag[read_reg2];
+    
 endmodule
 `default_nettype wire

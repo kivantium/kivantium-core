@@ -5,8 +5,7 @@ module reorderBuffer(clk, reset, stall, kill, tag1, tag2, arf_dest, read_data1, 
                      dc2rob, free_entry, commit_dest, commit_tag, commit_data, commit_we,
                      cdb1, cdb2, cdb3, jump_addr, mispred, commit_pc,
                      store2rob, loadbuf_en, loadbuf_free_entry, loadbuf_commit_entry,
-                     dmem_we, store_addr, store_data, misload,
-                     rob_head_pc);
+                     dmem_we, store_addr, store_data, misload);
   input wire clk, reset, stall, kill;
   input wire [5:0] tag1, tag2, arf_dest;
   output logic [32:0] read_data1, read_data2;
@@ -26,7 +25,6 @@ module reorderBuffer(clk, reset, stall, kill, tag1, tag2, arf_dest, read_data1, 
   output logic dmem_we;
   output logic [31:0] store_addr, store_data;
   input wire misload;
-  output logic [31:0] rob_head_pc;
 
   logic [63:0] busy, valid, taken;
   logic [5:0] dest [0:63];
@@ -44,13 +42,35 @@ module reorderBuffer(clk, reset, stall, kill, tag1, tag2, arf_dest, read_data1, 
 
   assign {dc_pc, dc_inst_type} = dc2rob;
   assign commit_we = (misload == 1'b1) ? 1'b0 : commit_we_pre; 
-
-  always_comb begin
-    read_data1 = {valid[tag1], reg_data[tag1]};
-    read_data2 = {valid[tag2], reg_data[tag2]};
+  
+  always_ff @(posedge clk) begin
+    if(reset || kill) begin
+      valid <= 64'b0;
+    end else begin
+      if(!stall) valid[free_entry] <= 1'b0;
+      valid[cdb1[37:32]] <= 1'b1;      
+      valid[cdb2[37:32]] <= 1'b1;
+      valid[cdb3[37:32]] <= 1'b1;
+      valid[jump_addr[38:33]] <= 1'b1;
+      valid[store2rob[69:64]] <= 1'b1;
+    end
   end
+    
+  always_ff @(posedge clk) begin
+    reg_data[cdb1[37:32]] <= cdb1[31:0];
+    reg_data[cdb2[37:32]] <= cdb2[31:0];
+    reg_data[cdb3[37:32]] <= cdb3[31:0];
+    reg_data[store2rob[69:64]] <= store2rob[31:0];
+  end  
+  
+  assign read_data1 = {valid[tag1], reg_data[tag1]};
+  assign read_data2 = {valid[tag2], reg_data[tag2]};
 
-  assign rob_head_pc = pc[head];
+  always_ff @(posedge clk) begin
+    addr[jump_addr[38:33]] <= jump_addr[31:0];
+    addr[store2rob[69:64]] <= store2rob[63:32];
+  end  
+
   always_ff @(posedge clk) begin
     if(reset || kill) begin
       head <= 6'd1;
@@ -121,34 +141,19 @@ module reorderBuffer(clk, reset, stall, kill, tag1, tag2, arf_dest, read_data1, 
   always_ff @(posedge clk) begin
     if(reset || mispred) begin
       busy <= 64'b0;
-      valid <= 64'b0;
       taken <= 64'b0;
     end else begin
       if(!stall) begin
         busy[free_entry] <= 1'b1;
-        valid[free_entry] <= 1'b0;
         taken[free_entry] <= 1'b0;
         pc[free_entry] <= dc_pc;
         inst_type[free_entry] <= dc_inst_type;
         dest[free_entry] <= arf_dest;
       end
-      valid[cdb1[37:32]] <= 1'b1;      
-      reg_data[cdb1[37:32]] <= cdb1[31:0];
-      valid[cdb2[37:32]] <= 1'b1;
-      reg_data[cdb2[37:32]] <= cdb2[31:0];
-      valid[cdb3[37:32]] <= 1'b1;
-      reg_data[cdb3[37:32]] <= cdb3[31:0];
-      
+      taken[jump_addr[38:33]] <= jump_addr[32];
       if(loadbuf_en) begin 
         load_entry[cdb3[37:32]] <= loadbuf_free_entry;
       end
-      
-      addr[jump_addr[38:33]] <= jump_addr[31:0];
-      taken[jump_addr[38:33]] <= jump_addr[32];
-      valid[jump_addr[38:33]] <= 1'b1;
-      valid[store2rob[69:64]] <= 1'b1;
-      addr[store2rob[69:64]] <= store2rob[63:32];
-      reg_data[store2rob[69:64]] <= store2rob[31:0];
     end
   end
 

@@ -20,8 +20,6 @@ module decode(pc, inst, src_reg1, src_reg2, rd_reg, dest_rob,
   logic [32:0] rs_opr1, rs_opr2;
   logic [31:0] rs_offset;
 
-  assign dc2rs = {rs_inst, dest_rob, rs_opr1, rs_opr2, rs_offset}; // 10+6+33*2+32 = 114
-
   always_comb begin
     case(inst_type)
       `LOAD: begin
@@ -146,6 +144,7 @@ module decode(pc, inst, src_reg1, src_reg2, rd_reg, dest_rob,
       end
     endcase
   end
+  assign dc2rs = {rs_inst, dest_rob, rs_opr1, rs_opr2, rs_offset};
 endmodule
 
 `default_nettype wire

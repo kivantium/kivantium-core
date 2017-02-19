@@ -15,7 +15,7 @@ module dataMemory(clk, reset, we, read_addr, read_data, write_addr, write_data,
     end
     read_data <= dmem[read_addr[11:2]];
   end
-  
+
   always_ff @(posedge clk) begin
     if(we) begin
       if(write_addr == 32'b0) stdout <= write_data[15:0];
