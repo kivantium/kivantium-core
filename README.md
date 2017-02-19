@@ -13,6 +13,7 @@ Progress
 - 2016/10/19 learned how to use Block RAM
 - 2016/10/24 instructions except `sw` and `lw` are working
 - 2016/11/01 recursive fib succeeded. [Video](https://twitter.com/kivantium/status/793435185488404481)
+- 2017/02/19 RISV-V based ISA worked in simulation.
 
 LICENSE
 --------
